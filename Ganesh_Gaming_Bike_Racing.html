@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Ganesh Gaming — Bike Racing</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#08111d;font-family:Arial,sans-serif;color:#fff;touch-action:none}
+#game{position:fixed;inset:0}canvas{display:block}
+#hud{position:fixed;top:12px;left:12px;right:12px;display:flex;justify-content:space-between;gap:8px;pointer-events:none}
+.panel{background:#06101dcc;border:1px solid #ffffff30;border-radius:13px;padding:9px 12px;backdrop-filter:blur(8px);font-weight:700;text-shadow:0 1px 2px #000}
+.small{font-size:11px;color:#b9d7ed;letter-spacing:1px}.value{font-size:19px;margin-top:3px}
+#brand{position:fixed;top:88px;left:50%;transform:translateX(-50%);font-weight:900;letter-spacing:2px;color:#fff;text-shadow:0 2px 12px #000;white-space:nowrap;font-size:15px}
+#overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:linear-gradient(#06101d99,#06101ddd);padding:22px}
+.card{width:min(430px,100%);text-align:center;background:#0b1a2bea;border:1px solid #ffffff2b;border-radius:22px;padding:25px 20px;box-shadow:0 20px 70px #0009}
+h1{margin:0 0 7px;font-size:29px;letter-spacing:1px}h1 span{color:#ffb52e}
+p{color:#c5d8e8;line-height:1.5;font-size:14px}
+button{border:0;border-radius:14px;padding:14px 22px;font-size:16px;font-weight:900;background:linear-gradient(135deg,#ffcf45,#ff8b22);color:#241300;box-shadow:0 6px 18px #ff9a2238}
+#controls{position:fixed;bottom:20px;left:0;right:0;display:flex;justify-content:space-between;padding:0 20px;pointer-events:none}
+.pad{display:flex;gap:12px;pointer-events:auto}
+.ctrl{width:66px;height:66px;border-radius:50%;background:#06101dcc;border:2px solid #ffffff66;color:white;font-size:25px;font-weight:bold;display:grid;place-items:center;user-select:none;-webkit-user-select:none}
+#nitro{width:74px;height:74px;background:#e85b20dd;border-color:#ffd2a4;font-size:13px}
+#hint{position:fixed;bottom:104px;left:50%;transform:translateX(-50%);font-size:11px;color:#e3efff;background:#06101d99;padding:7px 11px;border-radius:20px;white-space:nowrap}
+.hidden{display:none!important}
+</style>
+</head>
+<body>
+<div id="game"></div>
+<div id="hud" class="hidden">
+ <div class="panel"><div class="small">SCORE</div><div class="value" id="score">0</div></div>
+ <div class="panel"><div class="small">SPEED</div><div class="value"><span id="speed">0</span> km/h</div></div>
+ <div class="panel"><div class="small">BEST</div><div class="value" id="best">0</div></div>
+</div>
+<div id="brand" class="hidden">GANESH <span style="color:#ffb52e">GAMING</span></div>
+<div id="hint" class="hidden">LEFT / RIGHT से बाइक मोड़ो • नारंगी बटन = NITRO</div>
+<div id="controls" class="hidden">
+ <div class="pad"><div class="ctrl" id="left">◀</div><div class="ctrl" id="right">▶</div></div>
+ <div class="pad"><div class="ctrl" id="nitro">NITRO</div></div>
+</div>
+<div id="overlay">
+ <div class="card">
+  <h1>GANESH <span>GAMING</span></h1>
+  <p style="font-weight:bold;color:#fff">3D BIKE RACING</p>
+  <p>हाईवे पर बाइक चलाओ, ट्रैफिक से बचो और अपना हाई स्कोर बनाओ। मोबाइल पर टच कंट्रोल से खेल सकते हो।</p>
+  <p style="font-size:12px">नोट: 3D ग्राफिक्स लोड करने के लिए इंटरनेट कनेक्शन चाहिए।</p>
+  <button id="start">RACE START 🚀</button>
+ </div>
+</div>
+<script type="module">
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+
+const root=document.getElementById('game');
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x8bc7ef);
+scene.fog=new THREE.Fog(0x8bc7ef,35,145);
+const camera=new THREE.PerspectiveCamera(65,innerWidth/innerHeight,.1,220);
+camera.position.set(0,5.3,10.5);
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,1.7));
+renderer.setSize(innerWidth,innerHeight);
+renderer.shadowMap.enabled=true; renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.outputColorSpace=THREE.SRGBColorSpace;
+root.appendChild(renderer.domElement);
+scene.add(new THREE.HemisphereLight(0xe8f7ff,0x506044,2.0));
+const sun=new THREE.DirectionalLight(0xffffff,2.2);sun.position.set(-7,13,8);sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);scene.add(sun);
+
+const mat=(color,rough=.8,metal=0)=>new THREE.MeshStandardMaterial({color,roughness:rough,metalness:metal});
+const roadMat=mat(0x303943), lineMat=mat(0xf5f2df), grassMat=mat(0x477d3c), tireMat=mat(0x101318), metalMat=mat(0x9aa6b0,.3,.8);
+const road=new THREE.Mesh(new THREE.PlaneGeometry(12,220),roadMat);road.rotation.x=-Math.PI/2;road.position.set(0,-.04,-75);road.receiveShadow=true;scene.add(road);
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(220,260),grassMat);ground.rotation.x=-Math.PI/2;ground.position.set(0,-.08,-75);ground.receiveShadow=true;scene.add(ground);
+const dashGroup=new THREE.Group();scene.add(dashGroup);
+for(let z=15;z>-190;z-=10){for(let x of [-2,2]){let d=new THREE.Mesh(new THREE.BoxGeometry(.13,.035,4.2),lineMat);d.position.set(x,.015,z);dashGroup.add(d)}}
+for(let x of [-5.7,5.7]){let edge=new THREE.Mesh(new THREE.BoxGeometry(.18,.05,220),lineMat);edge.position.set(x,.02,-75);scene.add(edge)}
+// distant hills
+for(let i=0;i<18;i++){let h=5+Math.random()*12;let hill=new THREE.Mesh(new THREE.ConeGeometry(10+Math.random()*8,h,5),mat(i%2?0x729c75:0x648b70));hill.position.set((Math.random()-.5)*100,h/2-1,-55-Math.random()*120);scene.add(hill)}
+// simple roadside trees
+const trees=[];
+function tree(x,z){let g=new THREE.Group();let trunk=new THREE.Mesh(new THREE.CylinderGeometry(.18,.25,1.6,7),mat(0x684329));trunk.position.y=.8;g.add(trunk);let crown=new THREE.Mesh(new THREE.ConeGeometry(1.05,2.7,7),mat(0x23623d));crown.position.y=2.7;g.add(crown);g.position.set(x,0,z);scene.add(g);trees.push(g)}
+for(let z=12;z>-180;z-=13){tree(-8.5,z);tree(8.5,z-5)}
+// bike model
+const bike=new THREE.Group();scene.add(bike);
+function cyl(parent,r1,r2,len,material,x,y,z,rot=0){let m=new THREE.Mesh(new THREE.CylinderGeometry(r1,r2,len,16),material);m.rotation.z=rot;m.position.set(x,y,z);m.castShadow=true;parent.add(m);return m}
+function wheel(z){let w=new THREE.Mesh(new THREE.TorusGeometry(.48,.13,10,24),tireMat);w.rotation.y=Math.PI/2;w.position.set(0,.55,z);w.castShadow=true;bike.add(w);let hub=new THREE.Mesh(new THREE.CylinderGeometry(.19,.19,.2,16),metalMat);hub.rotation.z=Math.PI/2;hub.position.set(0,.55,z);bike.add(hub)}
+wheel(-.95);wheel(.95);
+const frame=mat(0xe52d27,.35,.45), black=mat(0x171c22,.4,.4), seat=mat(0x171719,.6);
+let body=new THREE.Mesh(new THREE.BoxGeometry(.42,.38,1.25),frame);body.position.set(0,1.03,0);body.castShadow=true;bike.add(body);
+let tank=new THREE.Mesh(new THREE.SphereGeometry(.38,16,12),frame);tank.scale.set(.75,.7,1.1);tank.position.set(0,1.32,-.18);bike.add(tank);
+let saddle=new THREE.Mesh(new THREE.BoxGeometry(.55,.16,.72),seat);saddle.position.set(0,1.42,.48);bike.add(saddle);
+let rider=new THREE.Mesh(new THREE.SphereGeometry(.32,14,12),mat(0x27384c));rider.scale.set(.85,1.25,.8);rider.position.set(0,1.86,.35);bike.add(rider);
+let helmet=new THREE.Mesh(new THREE.SphereGeometry(.3,16,12),mat(0xffbd35,.3,.1));helmet.position.set(0,2.27,.22);bike.add(helmet);
+let handle=new THREE.Mesh(new THREE.CylinderGeometry(.055,.055,1.05,10),metalMat);handle.rotation.z=Math.PI/2;handle.position.set(0,1.57,-.83);bike.add(handle);
+for(let x of [-.43,.43]){let fork=new THREE.Mesh(new THREE.CylinderGeometry(.055,.07,.82,10),metalMat);fork.position.set(x,.98,-.88);bike.add(fork)}
+bike.position.set(0,0,4);
+
+const obstacles=[];const obstacleMats=[mat(0x2378c8,.35,.25),mat(0xd84b25,.4,.2),mat(0xe7c72d,.4,.1)];
+function spawnObstacle(z){let g=new THREE.Group();let car=new THREE.Mesh(new THREE.BoxGeometry(1.45,.75,2.1),obstacleMats[Math.floor(Math.random()*3)]);car.position.y=.58;car.castShadow=true;g.add(car);let top=new THREE.Mesh(new THREE.BoxGeometry(1.05,.42,1.05),mat(0x9ed9ef,.25,.2));top.position.set(0,1.12,-.12);g.add(top);for(let x of [-.52,.52])for(let zz of [-.68,.68]){let w=new THREE.Mesh(new THREE.CylinderGeometry(.19,.19,.12,12),tireMat);w.rotation.z=Math.PI/2;w.position.set(x,.32,zz);g.add(w)}g.position.set([-3.8,0,3.8][Math.floor(Math.random()*3)],0,z);scene.add(g);obstacles.push(g)}
+let running=false,score=0,speed=0,steer=0,nitro=false,last=0,spawn=0,gameOver=false;
+let best=Number(localStorage.getItem('ggBikeBest')||0);document.getElementById('best').textContent=best;
+const $=id=>document.getElementById(id);
+function press(id,down){const el=$(id);el.addEventListener('pointerdown',e=>{e.preventDefault();down(true)});['pointerup','pointercancel','pointerleave'].forEach(ev=>el.addEventListener(ev,e=>{down(false)}))}
+press('left',v=>{keys.left=v});press('right',v=>{keys.right=v});press('nitro',v=>{nitro=v});
+const keys={left:false,right:false};
+addEventListener('keydown',e=>{if(e.key==='ArrowLeft'||e.key==='a')keys.left=true;if(e.key==='ArrowRight'||e.key==='d')keys.right=true;if(e.code==='Space')nitro=true});
+addEventListener('keyup',e=>{if(e.key==='ArrowLeft'||e.key==='a')keys.left=false;if(e.key==='ArrowRight'||e.key==='d')keys.right=false;if(e.code==='Space')nitro=false});
+function reset(){obstacles.forEach(o=>scene.remove(o));obstacles.length=0;score=0;speed=0;steer=0;spawn=0;gameOver=false;bike.position.x=0;bike.rotation.z=0}
+function start(){reset();running=true;$('overlay').classList.add('hidden');$('hud').classList.remove('hidden');$('brand').classList.remove('hidden');$('controls').classList.remove('hidden');$('hint').classList.remove('hidden');last=performance.now();requestAnimationFrame(loop)}
+$('start').addEventListener('click',start);
+function end(){running=false;gameOver=true;best=Math.max(best,Math.floor(score));localStorage.setItem('ggBikeBest',best);$('best').textContent=best;$('overlay').innerHTML=`<div class="card"><h1>RACE <span>OVER</span></h1><p>तुम्हारा स्कोर: <b>${Math.floor(score)}</b><br>बेस्ट स्कोर: <b>${best}</b></p><button id="again">PLAY AGAIN 🔁</button></div>`;$('overlay').classList.remove('hidden');$('again').addEventListener('click',start)}
+function loop(t){if(!running)return;let dt=Math.min((t-last)/1000,.04);last=t;speed=Math.min(150,speed+(nitro?100:45)*dt);speed=Math.max(65,speed-12*dt);let pace=(speed/95)*(nitro?1.55:1);
+steer+=( (keys.right?1:0)-(keys.left?1:0))*dt*5.5;steer*=Math.pow(.03,dt);bike.position.x=THREE.MathUtils.clamp(bike.position.x+steer*dt*5,-4.6,4.6);bike.rotation.z=THREE.MathUtils.lerp(bike.rotation.z,-steer*.13,.12);
+dashGroup.position.z+=pace*dt*24;if(dashGroup.position.z>10)dashGroup.position.z=0;
+trees.forEach(tr=>{tr.position.z+=pace*dt*24;if(tr.position.z>18)tr.position.z-=195});
+spawn-=dt;if(spawn<=0){spawnObstacle(-145);spawn=1.1+Math.random()*.65}
+for(let i=obstacles.length-1;i>=0;i--){let o=obstacles[i];o.position.z+=pace*dt*25;if(Math.abs(o.position.z-bike.position.z)<1.5&&Math.abs(o.position.x-bike.position.x)<1.15){end();return}if(o.position.z>14){scene.remove(o);obstacles.splice(i,1)}}
+score+=pace*dt*12;$('score').textContent=Math.floor(score);$('speed').textContent=Math.floor(speed);
+camera.position.x+=(bike.position.x*.28-camera.position.x)*.04;camera.lookAt(bike.position.x*.2,1,-5);
+renderer.render(scene,camera);requestAnimationFrame(loop)}
+function resize(){camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)}
+addEventListener('resize',resize);renderer.render(scene,camera);
+</script>
+</body>
+</html>
